@@ -52,7 +52,7 @@ export default function ProductionSignalTooltip({ band, row, x, y }) {
         </Row>
         <Row label="Batch">{PROCESS_ORDER.batch}</Row>
         <Row label="Time">
-          {band.startTime} – {band.endTime}
+          {band.startTime} - {band.endTime}
         </Row>
         <Row label="Output (Run Rate)">
           {num(outputPerMin)} pcs{" "}

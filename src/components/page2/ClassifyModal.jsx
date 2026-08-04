@@ -7,7 +7,7 @@ import "./ClassifyModal.css";
  * ClassifyModal (PRD Bab 8.2 / 8.3) — category → reason → machine → time → notes.
  * Reused for downtime, minor stop, and reject classification.
  *
- * @param {string} kind         "downtime" | "minorstop" | "reject"
+ * @param {string} kind         "downtime" | "minorstop" | "speedloss" | "reject"
  * @param {Array}  categories   [{ id, label, reasons: [] }]
  * @param {object} context      { range, durationMin, machine, quantity }
  */
@@ -25,6 +25,8 @@ export default function ClassifyModal({
       ? "Edit Downtime"
       : kind === "minorstop"
       ? "Edit Minor Stop"
+      : kind === "speedloss"
+      ? "Edit Speed Loss"
       : "Edit Reject";
 
   const [catId, setCatId] = useState(categories[0]?.id ?? "");
@@ -70,8 +72,22 @@ export default function ClassifyModal({
       }
       wide
       headerRight={
-        <Badge tone={kind === "reject" ? "danger" : kind === "minorstop" ? "warning" : "danger"}>
-          {kind === "minorstop" ? "MINOR STOP" : kind === "reject" ? "REJECT" : "DOWNTIME"}
+        <Badge
+          tone={
+            kind === "reject"
+              ? "danger"
+              : kind === "minorstop" || kind === "speedloss"
+              ? "warning"
+              : "danger"
+          }
+        >
+          {kind === "minorstop"
+            ? "MINOR STOP"
+            : kind === "speedloss"
+            ? "SPEED LOSS"
+            : kind === "reject"
+            ? "REJECT"
+            : "DOWNTIME"}
         </Badge>
       }
       footer={
