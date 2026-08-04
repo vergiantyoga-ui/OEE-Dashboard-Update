@@ -38,3 +38,19 @@ export function shiftForHour(hour) {
   if (hour >= 15 && hour < 23) return { no: 2, label: "15:00 – 23:00" };
   return { no: 3, label: "23:00 – 07:00" };
 }
+
+/** "HH:MM" -> minutes since 00:00. Returns null if the string can't be parsed. */
+export function hmToMinutes(hm) {
+  if (typeof hm !== "string") return null;
+  const m = hm.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/** Minutes since 00:00 -> "HH:MM", wrapping past midnight. */
+export function minutesToHm(mins) {
+  const wrapped = ((Math.round(mins) % 1440) + 1440) % 1440;
+  const h = Math.floor(wrapped / 60);
+  const m = wrapped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
