@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
 import { Card } from "../components/ui";
 import StackedTimeline from "../components/page2/StackedTimeline.jsx";
+import CategoryButtons from "../components/page2/CategoryButtons.jsx";
 import EventOverview from "../components/page2/EventOverview.jsx";
 import ClassifyModal from "../components/page2/ClassifyModal.jsx";
 import {
   buildTimeline,
   DOWNTIME_EVENTS,
+  MAJOR_STOP_EVENTS,
+  SPEED_LOSS_EVENTS,
+  REJECT_EVENTS,
   DOWNTIME_CATEGORIES,
   REJECT_CATEGORIES,
 } from "../data/mockData.js";
@@ -18,11 +22,19 @@ const TIME_WINDOWS = [
 ];
 
 /**
- * Page 2 — Input Reason OEE (PRD Bab 8). Stacked-bar timeline + downtime
- * and reject overviews, all feeding the shared classify modal.
+ * Page 2 — Input Reason OEE (PRD Bab 8, restructured per user request).
  *
- * When a timeline segment is classified, its reason is stored in `reasonMap`
- * (keyed by page window + band id) and rendered back onto the segment.
+ * Layout:
+ *  1. CategoryButtons  — 4 quick-access buttons (Downtime / Major Stop /
+ *     Speed Loss / Reject-Scrap) as a summary strip above the timeline.
+ *     Clicking one opens that category's list as a popup (EventOverview),
+ *     replacing the old always-visible two-card layout.
+ *  2. Production Timeline — unchanged; clicking a red/yellow/orange segment
+ *     still opens the classify modal directly.
+ *
+ * From the popup, clicking "Classify" closes the popup and opens the shared
+ * ClassifyModal (category → reason → machine → notes), matching the flow
+ * shown in the approved mockup.
  */
 export default function Page2Reason({ onToast }) {
   const [pageIdx, setPageIdx] = useState(0);
@@ -32,7 +44,6 @@ export default function Page2Reason({ onToast }) {
 
   const rows = useMemo(() => {
     const built = buildTimeline(TIME_WINDOWS[pageIdx].start, 8, 42 + pageIdx);
-    // apply any saved reasons for the current window
     return built.map((row) => ({
       ...row,
       bands: row.bands.map((b) => {
@@ -42,64 +53,95 @@ export default function Page2Reason({ onToast }) {
     }));
   }, [pageIdx, reasonMap]);
 
+  // 4 category event lists, each independently stateful
   const [downtimeEvents, setDowntimeEvents] = useState(DOWNTIME_EVENTS);
-  const [rejectEvents, setRejectEvents] = useState([
-    { id: "rj-1", range: "10:30 AM", quantity: 150, status: "uncommented" },
-    { id: "rj-2", range: "09:12 AM", quantity: 75, status: "uncommented" },
-    { id: "rj-3", range: "08:45 AM", quantity: 250, status: "uncommented" },
-  ]);
+  const [majorStopEvents, setMajorStopEvents] = useState(MAJOR_STOP_EVENTS);
+  const [speedLossEvents, setSpeedLossEvents] = useState(SPEED_LOSS_EVENTS);
+  const [rejectEvents, setRejectEvents] = useState(REJECT_EVENTS);
 
+  const CATEGORY_CONFIG = {
+    downtime: {
+      key: "downtime",
+      label: "Downtime",
+      glyph: "D",
+      tone: "danger",
+      events: downtimeEvents,
+      setEvents: setDowntimeEvents,
+      categories: DOWNTIME_CATEGORIES,
+      quantityKey: false,
+    },
+    majorstop: {
+      key: "majorstop",
+      label: "Major Stop",
+      glyph: "MS",
+      tone: "warning",
+      events: majorStopEvents,
+      setEvents: setMajorStopEvents,
+      categories: DOWNTIME_CATEGORIES,
+      quantityKey: false,
+    },
+    speedloss: {
+      key: "speedloss",
+      label: "Speed Loss",
+      glyph: "SL",
+      tone: "warning",
+      events: speedLossEvents,
+      setEvents: setSpeedLossEvents,
+      categories: DOWNTIME_CATEGORIES,
+      quantityKey: false,
+    },
+    reject: {
+      key: "reject",
+      label: "Reject / Scrap",
+      glyph: "RJ",
+      tone: "danger",
+      events: rejectEvents,
+      setEvents: setRejectEvents,
+      categories: REJECT_CATEGORIES,
+      quantityKey: true,
+    },
+  };
+
+  const buttonData = Object.values(CATEGORY_CONFIG).map((c) => ({
+    key: c.key,
+    label: c.label,
+    glyph: c.glyph,
+    tone: c.tone,
+    total: c.events.length,
+    uncommented: c.events.filter((e) => e.status === "uncommented").length,
+  }));
+
+  // which category popup is open (null | "downtime" | "majorstop" | "speedloss" | "reject")
+  const [openCategory, setOpenCategory] = useState(null);
+  // the classify modal (opened either from a popup row, or directly from the timeline)
   const [modal, setModal] = useState(null);
 
-  function openDowntime(event) {
+  function classifyFromPopup(categoryKey, event) {
+    const cfg = CATEGORY_CONFIG[categoryKey];
+    setOpenCategory(null); // close the list popup first, per approved mockup
     setModal({
-      kind: "downtime",
-      categories: DOWNTIME_CATEGORIES,
-      context: {
-        range: event.range,
-        durationMin: event.durationMin,
-        machine: event.machine,
-      },
+      kind: categoryKey === "reject" ? "reject" : "downtime",
+      categories: cfg.categories,
+      context: cfg.quantityKey
+        ? { quantity: event.quantity, range: event.range }
+        : { range: event.range, durationMin: event.durationMin, machine: event.machine },
       commit: () =>
-        setDowntimeEvents((list) =>
+        cfg.setEvents((list) =>
           list.map((e) =>
             e.id === event.id
-              ? { ...e, status: "planned", reason: "Breakdown / Classified" }
+              ? { ...e, status: "planned", reason: "Classified" }
               : e
           )
         ),
     });
   }
 
-  function openReject(event) {
-    setModal({
-      kind: "reject",
-      categories: REJECT_CATEGORIES,
-      context: { quantity: event.quantity, range: event.range },
-      commit: () =>
-        setRejectEvents((list) =>
-          list.map((e) =>
-            e.id === event.id
-              ? { ...e, status: "planned", reason: "Process / Classified" }
-              : e
-          )
-        ),
-    });
-  }
-
-  // Classify a timeline segment directly. On save, store the reason so it
-  // renders on the segment and appears in its Production Signal tooltip.
   function openFromBand(band, row) {
     const kind = band.code === "D" ? "downtime" : "minorstop";
     setModal({
       kind,
       categories: DOWNTIME_CATEGORIES,
-      context: {
-        range: `${band.startTime} - ${band.endTime}`,
-        startTime: band.startTime,
-        endTime: band.endTime,
-        durationMin: band.minutes,
-      },
+      context: { range: `${band.startTime} - ${band.endTime}`, startTime: band.startTime, endTime: band.endTime, durationMin: band.minutes },
       commit: (payload) => {
         const label =
           payload?.causes?.[0]?.reason ||
@@ -110,8 +152,12 @@ export default function Page2Reason({ onToast }) {
     });
   }
 
+  const activePopup = openCategory ? CATEGORY_CONFIG[openCategory] : null;
+
   return (
     <div className="page2">
+      <CategoryButtons categories={buttonData} onOpen={setOpenCategory} />
+
       <Card
         title="Production Timeline Detail"
         action={
@@ -146,19 +192,16 @@ export default function Page2Reason({ onToast }) {
         </p>
       </Card>
 
-      <div className="page2__grid">
+      {activePopup && (
         <EventOverview
-          title="Downtime Overview"
-          events={downtimeEvents}
-          onClassify={openDowntime}
+          open={!!activePopup}
+          title={activePopup.label}
+          events={activePopup.events}
+          quantityKey={activePopup.quantityKey}
+          onClose={() => setOpenCategory(null)}
+          onClassify={(event) => classifyFromPopup(activePopup.key, event)}
         />
-        <EventOverview
-          title="Reject / Scrap Overview"
-          events={rejectEvents}
-          onClassify={openReject}
-          quantityKey
-        />
-      </div>
+      )}
 
       {modal && (
         <ClassifyModal
