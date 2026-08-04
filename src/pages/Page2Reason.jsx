@@ -6,9 +6,6 @@ import EventOverview from "../components/page2/EventOverview.jsx";
 import ClassifyModal from "../components/page2/ClassifyModal.jsx";
 import {
   buildTimeline,
-  DOWNTIME_EVENTS,
-  MAJOR_STOP_EVENTS,
-  SPEED_LOSS_EVENTS,
   REJECT_EVENTS,
   DOWNTIME_CATEGORIES,
   REJECT_CATEGORIES,
@@ -21,20 +18,39 @@ const TIME_WINDOWS = [
   { id: 2, label: "00:00 – 06:00", start: 0 },
 ];
 
+/** Pull every band of a given window-classification code out of the current
+ * timeline rows, in the exact shape EventOverview / ClassifyModal expect.
+ * This is the single source of truth for time ranges: Downtime, Minor Stop,
+ * and Speed Loss popups always show the same start/end times as the bars on
+ * Production Timeline Detail, because they're read from the same bands.
+ */
+function deriveCategoryEvents(rows, code) {
+  return rows.flatMap((row) =>
+    row.bands
+      .filter((b) => b.code === code)
+      .map((b) => ({
+        id: b.id,
+        range: `${b.startTime} - ${b.endTime}`,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        durationMin: b.minutes,
+        machine: b.machine,
+        reason: b.reason,
+        status: b.reason ? "planned" : "uncommented",
+      }))
+  );
+}
+
 /**
  * Page 2 — Input Reason OEE (PRD Bab 8, restructured per user request).
  *
- * Layout:
- *  1. CategoryButtons  — 4 quick-access buttons (Downtime / Major Stop /
- *     Speed Loss / Reject-Scrap) as a summary strip above the timeline.
- *     Clicking one opens that category's list as a popup (EventOverview),
- *     replacing the old always-visible two-card layout.
- *  2. Production Timeline — unchanged; clicking a red/yellow/orange segment
- *     still opens the classify modal directly.
- *
- * From the popup, clicking "Classify" closes the popup and opens the shared
- * ClassifyModal (category → reason → machine → notes), matching the flow
- * shown in the approved mockup.
+ * 4 category buttons (Downtime / Minor Stop / Speed Loss / Reject-Scrap)
+ * sit above the timeline as a quick-access summary. Downtime, Minor Stop,
+ * and Speed Loss events are DERIVED from the timeline bands (not a separate
+ * mock list) so their time ranges are always consistent with the bar chart.
+ * Reject/Scrap has no bar-chart representation, so it keeps its own event
+ * list. Classifying from a popup or directly from a bar both write into the
+ * same `reasonMap`, so either path updates the timeline label immediately.
  */
 export default function Page2Reason({ onToast }) {
   const [pageIdx, setPageIdx] = useState(0);
@@ -53,10 +69,11 @@ export default function Page2Reason({ onToast }) {
     }));
   }, [pageIdx, reasonMap]);
 
-  // 4 category event lists, each independently stateful
-  const [downtimeEvents, setDowntimeEvents] = useState(DOWNTIME_EVENTS);
-  const [majorStopEvents, setMajorStopEvents] = useState(MAJOR_STOP_EVENTS);
-  const [speedLossEvents, setSpeedLossEvents] = useState(SPEED_LOSS_EVENTS);
+  const downtimeEvents = useMemo(() => deriveCategoryEvents(rows, "D"), [rows]);
+  const minorStopEvents = useMemo(() => deriveCategoryEvents(rows, "MS"), [rows]);
+  const speedLossEvents = useMemo(() => deriveCategoryEvents(rows, "SL"), [rows]);
+
+  // Reject/Scrap has no bar on the timeline, so it stays its own mock state.
   const [rejectEvents, setRejectEvents] = useState(REJECT_EVENTS);
 
   const CATEGORY_CONFIG = {
@@ -66,18 +83,14 @@ export default function Page2Reason({ onToast }) {
       glyph: "D",
       tone: "danger",
       events: downtimeEvents,
-      setEvents: setDowntimeEvents,
-      categories: DOWNTIME_CATEGORIES,
       quantityKey: false,
     },
-    majorstop: {
-      key: "majorstop",
-      label: "Major Stop",
+    minorstop: {
+      key: "minorstop",
+      label: "Minor Stop",
       glyph: "MS",
       tone: "warning",
-      events: majorStopEvents,
-      setEvents: setMajorStopEvents,
-      categories: DOWNTIME_CATEGORIES,
+      events: minorStopEvents,
       quantityKey: false,
     },
     speedloss: {
@@ -86,8 +99,6 @@ export default function Page2Reason({ onToast }) {
       glyph: "SL",
       tone: "warning",
       events: speedLossEvents,
-      setEvents: setSpeedLossEvents,
-      categories: DOWNTIME_CATEGORIES,
       quantityKey: false,
     },
     reject: {
@@ -96,8 +107,6 @@ export default function Page2Reason({ onToast }) {
       glyph: "RJ",
       tone: "danger",
       events: rejectEvents,
-      setEvents: setRejectEvents,
-      categories: REJECT_CATEGORIES,
       quantityKey: true,
     },
   };
@@ -111,37 +120,67 @@ export default function Page2Reason({ onToast }) {
     uncommented: c.events.filter((e) => e.status === "uncommented").length,
   }));
 
-  // which category popup is open (null | "downtime" | "majorstop" | "speedloss" | "reject")
+  // which category popup is open (null | "downtime" | "minorstop" | "speedloss" | "reject")
   const [openCategory, setOpenCategory] = useState(null);
   // the classify modal (opened either from a popup row, or directly from the timeline)
   const [modal, setModal] = useState(null);
 
   function classifyFromPopup(categoryKey, event) {
-    const cfg = CATEGORY_CONFIG[categoryKey];
     setOpenCategory(null); // close the list popup first, per approved mockup
+
+    if (categoryKey === "reject") {
+      setModal({
+        kind: "reject",
+        categories: REJECT_CATEGORIES,
+        context: { quantity: event.quantity, range: event.range },
+        commit: () =>
+          setRejectEvents((list) =>
+            list.map((e) =>
+              e.id === event.id
+                ? { ...e, status: "planned", reason: "Classified" }
+                : e
+            )
+          ),
+      });
+      return;
+    }
+
+    // downtime / minorstop / speedloss: event.id IS the timeline band id, so
+    // committing writes straight into reasonMap — same mechanism as clicking
+    // the bar directly — keeping both views in sync.
     setModal({
-      kind: categoryKey === "reject" ? "reject" : "downtime",
-      categories: cfg.categories,
-      context: cfg.quantityKey
-        ? { quantity: event.quantity, range: event.range }
-        : { range: event.range, durationMin: event.durationMin, machine: event.machine },
-      commit: () =>
-        cfg.setEvents((list) =>
-          list.map((e) =>
-            e.id === event.id
-              ? { ...e, status: "planned", reason: "Classified" }
-              : e
-          )
-        ),
+      kind: categoryKey,
+      categories: DOWNTIME_CATEGORIES,
+      context: {
+        range: event.range,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        durationMin: event.durationMin,
+        machine: event.machine,
+      },
+      commit: (payload) => {
+        const label =
+          payload?.causes?.[0]?.reason ||
+          payload?.causes?.[0]?.category ||
+          "Classified";
+        setReasonMap((m) => ({ ...m, [`${pageIdx}:${event.id}`]: label }));
+      },
     });
   }
 
   function openFromBand(band, row) {
-    const kind = band.code === "D" ? "downtime" : "minorstop";
+    const kind =
+      band.code === "D" ? "downtime" : band.code === "SL" ? "speedloss" : "minorstop";
     setModal({
       kind,
       categories: DOWNTIME_CATEGORIES,
-      context: { range: `${band.startTime} - ${band.endTime}`, startTime: band.startTime, endTime: band.endTime, durationMin: band.minutes },
+      context: {
+        range: `${band.startTime} - ${band.endTime}`,
+        startTime: band.startTime,
+        endTime: band.endTime,
+        durationMin: band.minutes,
+        machine: band.machine,
+      },
       commit: (payload) => {
         const label =
           payload?.causes?.[0]?.reason ||
