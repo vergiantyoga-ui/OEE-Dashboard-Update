@@ -1,26 +1,39 @@
 import { useState } from "react";
-import { Card, Badge, Button } from "../ui";
+import { Modal, Badge, Button } from "../ui";
 import "./EventOverview.css";
 
 /**
- * EventOverview (PRD Bab 8.2 / 8.3) — lists events needing classification,
- * split into Uncommented (action required) and Committed/Planned tabs.
+ * EventOverview (PRD Bab 8.2 / 8.3) — popup listing events that need
+ * classification for one category, split into Uncommented (action required)
+ * and Committed tabs. Rendered inside a Modal (opened from CategoryButtons).
  *
- * @param {string} title
- * @param {Array}  events   [{ id, range, durationMin, status, machine, reason }]
+ * @param {boolean} open
+ * @param {string}  title
+ * @param {Array}   events   [{ id, range, durationMin | quantity, status, machine, reason }]
  * @param {Function} onClassify
+ * @param {Function} onClose
+ * @param {boolean} quantityKey  true for reject (Time/Quantity) vs downtime (Time Range/Duration)
  */
-export default function EventOverview({ title, events, onClassify, quantityKey = false }) {
+export default function EventOverview({
+  open,
+  title,
+  events,
+  onClassify,
+  onClose,
+  quantityKey = false,
+}) {
   const [tab, setTab] = useState("uncommented");
 
   const uncommented = events.filter((e) => e.status === "uncommented");
-  const planned = events.filter((e) => e.status !== "uncommented");
-  const rows = tab === "uncommented" ? uncommented : planned;
+  const committed = events.filter((e) => e.status !== "uncommented");
+  const rows = tab === "uncommented" ? uncommented : committed;
 
   return (
-    <Card
-      title={title}
-      action={
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`${title} overview`}
+      headerRight={
         uncommented.length > 0 && (
           <Badge tone="warning">{uncommented.length} action required</Badge>
         )
@@ -38,11 +51,11 @@ export default function EventOverview({ title, events, onClassify, quantityKey =
           </button>
           <button
             role="tab"
-            aria-selected={tab === "planned"}
-            className={`evo__tab ${tab === "planned" ? "is-active" : ""}`}
-            onClick={() => setTab("planned")}
+            aria-selected={tab === "committed"}
+            className={`evo__tab ${tab === "committed" ? "is-active" : ""}`}
+            onClick={() => setTab("committed")}
           >
-            Committed ({planned.length})
+            Committed ({committed.length})
           </button>
         </div>
 
@@ -92,6 +105,6 @@ export default function EventOverview({ title, events, onClassify, quantityKey =
           </ul>
         )}
       </div>
-    </Card>
+    </Modal>
   );
 }
