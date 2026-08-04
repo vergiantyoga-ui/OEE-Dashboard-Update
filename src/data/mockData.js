@@ -199,26 +199,70 @@ export const DOWNTIME_EVENTS = [
   },
   {
     id: "dt-2",
-    range: "09:12 - 09:15",
-    durationMin: 3,
-    status: "uncommented",
-    machine: "LSP01",
-  },
-  {
-    id: "dt-3",
     range: "08:45 - 08:55",
     durationMin: 10,
     status: "uncommented",
     machine: "LTF01",
   },
   {
-    id: "dt-4",
+    id: "dt-3",
     range: "07:40 - 07:52",
     durationMin: 12,
     status: "planned",
     machine: "LBC01",
     reason: "Breakdown / Conveyor Breakdown",
   },
+];
+
+/* ---- Major Stop overview rows (no output, <=10 min per PRD Bab 5.3) ---- */
+export const MAJOR_STOP_EVENTS = [
+  {
+    id: "ms-1",
+    range: "09:12 - 09:15",
+    durationMin: 3,
+    status: "uncommented",
+    machine: "LSP01",
+  },
+  {
+    id: "ms-2",
+    range: "11:20 - 11:31",
+    durationMin: 8,
+    status: "uncommented",
+    machine: "LSP01",
+  },
+];
+
+/* ---- Speed Loss overview rows (actual < standard output, PRD Bab 5.3) ---- */
+export const SPEED_LOSS_EVENTS = [
+  {
+    id: "sl-1",
+    range: "09:00 - 09:36",
+    durationMin: 36,
+    status: "uncommented",
+    machine: "LBC01",
+  },
+  {
+    id: "sl-2",
+    range: "13:05 - 13:14",
+    durationMin: 9,
+    status: "uncommented",
+    machine: "LTF01",
+  },
+  {
+    id: "sl-3",
+    range: "12:00 - 12:19",
+    durationMin: 19,
+    status: "planned",
+    machine: "LSP01",
+    reason: "Set Up / Changeover",
+  },
+];
+
+/* ---- Reject / scrap overview rows (PRD Bab 8.3) ---- */
+export const REJECT_EVENTS = [
+  { id: "rj-1", range: "10:30 AM", quantity: 150, status: "uncommented" },
+  { id: "rj-2", range: "09:12 AM", quantity: 75, status: "uncommented" },
+  { id: "rj-3", range: "08:45 AM", quantity: 250, status: "uncommented" },
 ];
 
 export const DOWNTIME_CATEGORIES = [
