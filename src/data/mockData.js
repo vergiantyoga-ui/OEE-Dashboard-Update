@@ -188,75 +188,12 @@ export const QA = {
   intervalPcs: 5000,
 };
 
-/* ---- Downtime overview rows (PRD Bab 8.2) ---- */
-export const DOWNTIME_EVENTS = [
-  {
-    id: "dt-1",
-    range: "10:30 - 10:36",
-    durationMin: 6,
-    status: "uncommented",
-    machine: "LTF01",
-  },
-  {
-    id: "dt-2",
-    range: "08:45 - 08:55",
-    durationMin: 10,
-    status: "uncommented",
-    machine: "LTF01",
-  },
-  {
-    id: "dt-3",
-    range: "07:40 - 07:52",
-    durationMin: 12,
-    status: "planned",
-    machine: "LBC01",
-    reason: "Breakdown / Conveyor Breakdown",
-  },
-];
-
-/* ---- Major Stop overview rows (no output, <=10 min per PRD Bab 5.3) ---- */
-export const MAJOR_STOP_EVENTS = [
-  {
-    id: "ms-1",
-    range: "09:12 - 09:15",
-    durationMin: 3,
-    status: "uncommented",
-    machine: "LSP01",
-  },
-  {
-    id: "ms-2",
-    range: "11:20 - 11:31",
-    durationMin: 8,
-    status: "uncommented",
-    machine: "LSP01",
-  },
-];
-
-/* ---- Speed Loss overview rows (actual < standard output, PRD Bab 5.3) ---- */
-export const SPEED_LOSS_EVENTS = [
-  {
-    id: "sl-1",
-    range: "09:00 - 09:36",
-    durationMin: 36,
-    status: "uncommented",
-    machine: "LBC01",
-  },
-  {
-    id: "sl-2",
-    range: "13:05 - 13:14",
-    durationMin: 9,
-    status: "uncommented",
-    machine: "LTF01",
-  },
-  {
-    id: "sl-3",
-    range: "12:00 - 12:19",
-    durationMin: 19,
-    status: "planned",
-    machine: "LSP01",
-    reason: "Set Up / Changeover",
-  },
-];
+/*
+ * Downtime / Minor Stop / Speed Loss event lists are NOT stored here as
+ * separate mock arrays anymore. They are derived directly from the
+ * production timeline bands (see deriveCategoryEvents in Page2Reason.jsx)
+ * so their time ranges always match what's shown on the stacked bar chart.
+ */
 
 /* ---- Reject / scrap overview rows (PRD Bab 8.3) ---- */
 export const REJECT_EVENTS = [
@@ -311,12 +248,14 @@ export function buildTimeline(startHour = 7, hours = 8, seed = 42) {
       const code = codesPool[Math.floor(rand() * codesPool.length)];
       const producing = code === "EF" || code === "SL";
       const output = producing ? span * (80 + Math.floor(rand() * 40)) : 0;
+      const machine = MACHINES[Math.floor(rand() * MACHINES.length)].id;
 
       bands.push({
         id: `${startHour + h}-${idx}`,
         code,
         minutes: span,
         output,
+        machine,
         startTime: clock(startHour + h, acc),
         endTime: clock(startHour + h, acc + span),
         reason: null, // filled in when the operator classifies this segment
