@@ -1,0 +1,47 @@
+.swipe-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%) scale(0.9);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--c-border);
+  background: #fff;
+  color: var(--c-blue);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.swipe-arrow.is-visible {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  pointer-events: auto;
+}
+
+.swipe-arrow--left {
+  left: 16px;
+}
+.swipe-arrow--right {
+  right: 16px;
+}
+
+.swipe-arrow:hover {
+  background: var(--c-blue-tint);
+}
+
+@media (max-width: 600px) {
+  .swipe-arrow {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}

@@ -1,0 +1,35 @@
+.pgind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: var(--sp-3) 0;
+  background: var(--c-page);
+  border-bottom: 1px solid var(--c-border-soft);
+}
+
+.pgind__title {
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: var(--c-navy);
+}
+
+.pgind__dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pgind__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--c-border);
+  transition: width 0.2s ease, background 0.2s ease;
+  display: inline-block;
+}
+
+.pgind__dot.is-active {
+  width: 18px;
+  background: var(--c-blue);
+}
